@@ -7,6 +7,56 @@
 #define QSH_TOK_BUFSIZE 64
 #define QSH_TOK_DELIM " \t\r\n\a"
 
+/* Builtin shell commands */
+int qsh_cd(char** args);
+int qsh_help(char** args);
+int qsh_exit(char** args);
+
+char* builtin_str[] = {
+    "cd",
+    "help",
+    "exit"
+};
+
+int (*builtin_func[]) (char**) = {
+    &qsh_cd,
+    &qsh_help,
+    &qsh_exit
+};
+
+int qsh_num_builtins(){
+    return sizeof(builtin_str) / sizeof(char*);
+}
+
+int qsh_cd(char** args){
+    if(args[1] == NULL){
+        fprintf(stderr, "qsh: expected argument to \"cd\"\n");
+    }
+    else{
+        if(chdir(args[1]) != 0){
+            perror("qsh");
+        }
+    }
+    return 1;
+}
+
+int qsh_help(char** args){
+    printf("You are using qsh.\n");
+    printf("Type commands and arguments. Builtins:\n");
+
+    /* print all builtin command names */
+    for(int i = 0; i < qsh_num_builtins(); i++){
+        printf("  %s\n", builtin_str[i]);
+    }
+    
+    printf("Use the \"man\" command for information on other commands.\n");
+    return 1;
+}
+
+int qsh_exit(char** args){
+    return 0;
+}
+
 int qsh_launch(char** args){
     pid_t pid = fork();
 
@@ -57,7 +107,7 @@ char** qsh_split_line(char* line){
             }
         }
 
-        token = strtok(line, QSH_TOK_DELIM);
+        token = strtok(NULL, QSH_TOK_DELIM);
     }
     tokens[position] = NULL;
     return tokens;
@@ -98,6 +148,19 @@ char* qsh_read_line(void){
     }
 }
 
+int qsh_execute(char** args){
+    if(args[0] == NULL){ /* empty command */
+        return 1;
+    }
+
+    for(int i = 0; i < qsh_num_builtins(); i++){
+        if(strcmp(args[0], builtin_str[i]) == 0)
+            return (*builtin_func[i])(args);
+    }
+    
+    return qsh_launch(args);
+}
+
 void qsh_loop(){
     int status = 1;
 
@@ -106,11 +169,11 @@ void qsh_loop(){
         char** args;
         printf("> ");
         line = qsh_read_line();
-        //args = qsh_split_line(line);
-        //status = qsh_execute(args);
+        args = qsh_split_line(line);
+        status = qsh_execute(args);
 
         free(line);
-        //free(args);
+        free(args);
     }
 }
 
