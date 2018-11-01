@@ -1,9 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #define QSH_RL_BUFSIZE 1024
 #define QSH_TOK_BUFSIZE 64
 #define QSH_TOK_DELIM " \t\r\n\a"
+
+int qsh_launch(char** args){
+    pid_t pid = fork();
+
+    if(pid == 0){ /* child process */
+        if(execvp(args[0], args) == -1){
+            /* perror() will find the error associated with global variable
+             * errno, and will write it. */
+            perror("qsh");
+        }
+        exit(EXIT_FAILURE); /* shouldn't get here*/
+    }
+    else if(pid < 0){ /* forking didn't work */
+        perror("qsh");
+    }
+    else{
+        int status;
+        pid_t wpid = waitpid(pid, &status, WUNTRACED);
+        /* WIFEXITED is true if process terminated normally via exit().
+         * WIFSIGNALED is true if process terminated due to receipt of signal.*/
+        while(!WIFEXITED(status) && !WIFSIGNALED(status))
+            wpid = waitpid(pid, &status, WUNTRACED);
+    }
+    return 1;
+}
 
 char** qsh_split_line(char* line){
     int bufsize = QSH_TOK_BUFSIZE;
